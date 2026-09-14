@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store.js'
+import { SESSION_KEY, currentUser, logOut } from './auth.js'
+import Auth from './views/Auth.jsx'
+import Settings from './views/Settings.jsx'
 import Dashboard from './views/Dashboard.jsx'
 import Contacts from './views/Contacts.jsx'
 import Companies from './views/Companies.jsx'
@@ -13,6 +16,8 @@ const NAV = [
   { id: 'deals', label: 'Deals', icon: 'kanban' }
 ]
 
+const VIEWS = [...NAV.map((n) => n.id), 'settings']
+
 function Icon({ name }) {
   const paths = {
     grid: 'M4 4h6v6H4V4Zm0 10h6v6H4v-6ZM14 4h6v6h-6V4Zm0 10h6v6h-6v-6Z',
@@ -20,7 +25,10 @@ function Icon({ name }) {
       'M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm0 1.75c-2.9 0-5.75 1.45-5.75 3.5V20h11.5v-3.75c0-2.05-2.85-3.5-5.75-3.5ZM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm4.75 8v-2.9c0-1.6-1.9-2.85-4.2-2.98 1.2.9 1.95 2.1 1.95 3.13V20h2.25Z',
     building:
       'M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v11H4Zm3-13h3V5H7v3Zm0 5h3v-3H7v3Zm0 5h3v-3H7v3Zm6 0h3v-3h-3v3Zm0-5h3v-3h-3v3Zm5 5h2v-3h-2v3Z',
-    kanban: 'M3 4h5v13H3V4Zm7.5 0h5v9h-5V4ZM18 4h3v16h-3V4Z'
+    kanban: 'M3 4h5v13H3V4Zm7.5 0h5v9h-5V4ZM18 4h3v16h-3V4Z',
+    gear: 'M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm8.4-2.6.05-.9-.05-.9 1.9-1.45-1.9-3.3-2.25.75a7.6 7.6 0 0 0-1.55-.9L16.2 3.6h-3.8l-.4 2.6c-.55.23-1.07.53-1.55.9l-2.25-.75-1.9 3.3L8.2 11.1c-.03.3-.05.6-.05.9s.02.6.05.9l-1.9 1.45 1.9 3.3 2.25-.75c.48.37 1 .67 1.55.9l.4 2.6h3.8l.4-2.6c.55-.23 1.07-.53 1.55-.9l2.25.75 1.9-3.3-1.9-1.45Z',
+    logout: 'M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3Zm6.2 4.4-1.4 1.4L16.6 11H9v2h7.6l-1.8 1.8 1.4 1.4L20.4 12l-4.2-4.6Z',
+    chevron: 'M7 10l5 5 5-5H7Z'
   }
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="ico">
@@ -29,11 +37,79 @@ function Icon({ name }) {
   )
 }
 
-export default function App() {
-  const store = useStore()
+function UserMenu({ user, onSettings, onLogout }) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div className="user-menu" ref={wrapRef}>
+      {open && (
+        <div className="user-pop" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="pop-item"
+            onClick={() => {
+              setOpen(false)
+              onSettings()
+            }}
+          >
+            <Icon name="gear" />
+            Settings
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="pop-item danger"
+            onClick={() => {
+              setOpen(false)
+              onLogout()
+            }}
+          >
+            <Icon name="logout" />
+            Log out
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        className="user-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="avatar" aria-hidden="true">
+          {user.initials}
+        </span>
+        <span className="user-id">
+          <strong>{user.name}</strong>
+          <small>{user.email}</small>
+        </span>
+        <Icon name="chevron" />
+      </button>
+    </div>
+  )
+}
+
+function Workspace({ user, onUserChange, onSignOut }) {
+  const store = useStore(user.id)
   const [view, setView] = useState(() => {
     const fromHash = window.location.hash.replace('#', '')
-    return NAV.some((n) => n.id === fromHash) ? fromHash : 'dashboard'
+    return VIEWS.includes(fromHash) ? fromHash : 'dashboard'
   })
   const [query, setQuery] = useState('')
   const [navOpen, setNavOpen] = useState(false)
@@ -46,7 +122,7 @@ export default function App() {
   useEffect(() => {
     const onPop = () => {
       const next = window.location.hash.replace('#', '')
-      if (NAV.some((n) => n.id === next)) setView(next)
+      if (VIEWS.includes(next)) setView(next)
     }
     window.addEventListener('hashchange', onPop)
     return () => window.removeEventListener('hashchange', onPop)
@@ -105,14 +181,23 @@ export default function App() {
                 </button>
               </li>
             ))}
+            <li>
+              <button
+                type="button"
+                className={'nav-item' + (view === 'settings' ? ' active' : '')}
+                aria-current={view === 'settings' ? 'page' : undefined}
+                onClick={() => setView('settings')}
+              >
+                <Icon name="gear" />
+                Settings
+              </button>
+            </li>
           </ul>
         </nav>
         <div className="sidebar-foot">
           <p className="side-label">Open pipeline</p>
           <p className="side-value">{fmtMoney(pipeline)}</p>
-          <button type="button" className="btn ghost sm" onClick={store.clearAll} disabled={store.isEmpty}>
-            Clear all data
-          </button>
+          <UserMenu user={user} onSettings={() => setView('settings')} onLogout={onSignOut} />
         </div>
       </aside>
 
@@ -168,11 +253,11 @@ export default function App() {
           </div>
           <div className="who">
             <span className="avatar" aria-hidden="true">
-              JR
+              {user.initials}
             </span>
             <span className="who-text">
-              <strong>Julian Rivera</strong>
-              <small>Sales lead</small>
+              <strong>{user.name}</strong>
+              <small>{user.email}</small>
             </span>
           </div>
         </header>
@@ -182,9 +267,47 @@ export default function App() {
           {view === 'contacts' && <Contacts store={store} />}
           {view === 'companies' && <Companies store={store} />}
           {view === 'deals' && <Deals store={store} />}
+          {view === 'settings' && (
+            <Settings user={user} store={store} onUserChange={onUserChange} onSignOut={onSignOut} />
+          )}
         </main>
       </div>
       {navOpen && <button type="button" className="scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
     </div>
+  )
+}
+
+export default function App() {
+  const [user, setUser] = useState(() => currentUser())
+
+  const handleAuthed = (nextUser) => {
+    window.location.hash = 'dashboard'
+    setUser(nextUser)
+  }
+
+  const handleSignOut = () => {
+    logOut()
+    window.location.hash = ''
+    setUser(null)
+  }
+
+  // Another tab logging in or out on this browser should not leave a stale session here.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === null || e.key === SESSION_KEY) setUser(currentUser())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  if (!user) return <Auth onAuthed={handleAuthed} />
+
+  return (
+    <Workspace
+      key={user.id}
+      user={user}
+      onUserChange={setUser}
+      onSignOut={handleSignOut}
+    />
   )
 }

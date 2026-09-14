@@ -17,7 +17,7 @@ export default class ErrorBoundary extends Component {
         <h1>Something went wrong loading your pipeline</h1>
         <p>
           The saved data in this browser could not be read. Reloading usually fixes it. If it keeps
-          happening, clear the stored data and start again from the sample dataset.
+          happening, clear the stored data, then sign up or log in again.
         </p>
         <p className="boundary-detail">{String(this.state.error?.message || this.state.error)}</p>
         <div className="boundary-actions">
@@ -29,7 +29,9 @@ export default class ErrorBoundary extends Component {
             className="btn ghost"
             onClick={() => {
               try {
-                localStorage.removeItem('pipeline-crm.v2')
+                Object.keys(localStorage)
+                  .filter((k) => k.startsWith('pipeline-crm.v2'))
+                  .forEach((k) => localStorage.removeItem(k))
               } catch {
                 /* ignore */
               }

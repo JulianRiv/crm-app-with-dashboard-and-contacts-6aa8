@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-
-const KEY = 'pipeline-crm.v2'
+import { dataKeyFor } from './auth.js'
 
 const EMPTY = { companies: [], contacts: [], deals: [], activities: [] }
 
-function load() {
+function load(key) {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = key ? localStorage.getItem(key) : null
     if (!raw) return { ...EMPTY }
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return { ...EMPTY }
@@ -25,24 +24,43 @@ function uid(prefix) {
   return prefix + Math.random().toString(36).slice(2, 9)
 }
 
-export function useStore() {
-  const [data, setData] = useState(load)
+/** Store scoped to one account. Each user's records live under their own
+ *  localStorage key, so switching accounts swaps the whole dataset. */
+export function useStore(userId) {
+  const key = userId ? dataKeyFor(userId) : null
+  const [state, setState] = useState(() => ({ key, data: load(key) }))
+
+  // Swap datasets during render when the account changes, so no effect can
+  // ever write one account's records into another account's storage key.
+  if (state.key !== key) setState({ key, data: load(key) })
+
+  const data = state.key === key ? state.data : load(key)
+  const setData = useCallback((updater) => {
+    setState((prev) => ({
+      key: prev.key,
+      data: typeof updater === 'function' ? updater(prev.data) : updater
+    }))
+  }, [])
 
   useEffect(() => {
+    if (state.key !== key || !key) return
     try {
-      localStorage.setItem(KEY, JSON.stringify(data))
+      localStorage.setItem(key, JSON.stringify(state.data))
     } catch {
       /* storage full or blocked; state still works in memory */
     }
-  }, [data])
+  }, [state, key])
 
   const api = useMemo(() => {
-    const upsert = (key, prefix) => (item) => {
+    const upsert = (collection, prefix) => (item) => {
       setData((d) => {
         if (item.id) {
-          return { ...d, [key]: d[key].map((x) => (x.id === item.id ? { ...x, ...item } : x)) }
+          return { ...d, [collection]: d[collection].map((x) => (x.id === item.id ? { ...x, ...item } : x)) }
         }
-        return { ...d, [key]: [{ ...item, id: uid(prefix), createdAt: new Date().toISOString() }, ...d[key]] }
+        return {
+          ...d,
+          [collection]: [{ ...item, id: uid(prefix), createdAt: new Date().toISOString() }, ...d[collection]]
+        }
       })
     }
     return {
@@ -83,7 +101,7 @@ export function useStore() {
   }, [])
 
   const clearAll = useCallback(() => {
-    if (window.confirm('Delete every contact, company, deal and note? This cannot be undone.')) {
+    if (window.confirm('Delete every contact, company, deal and note in this account? This cannot be undone.')) {
       setData({ ...EMPTY })
     }
   }, [])
