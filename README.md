@@ -1,6 +1,6 @@
 # Pipeline CRM
 
-A single-page CRM for tracking contacts, companies and deals through a sales pipeline. All data lives in the browser under one localStorage key (`pipeline-crm.v1`) and is seeded with realistic sample data on first run.
+A single-page CRM for tracking contacts, companies and deals through a sales pipeline. All data lives in the browser under one localStorage key (`pipeline-crm.v2`). The app starts as a clean slate: no sample data, every list empty until you add records. "Clear all data" in the sidebar wipes everything back to that state.
 
 ## Views
 

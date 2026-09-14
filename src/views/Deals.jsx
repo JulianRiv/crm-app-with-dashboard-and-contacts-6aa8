@@ -109,7 +109,13 @@ export default function Deals({ store }) {
       <div className="page-head">
         <div>
           <h1>Deals</h1>
-          <p className="muted">Drag a card between columns to change its stage. Changes save automatically.</p>
+          <p className="muted">
+            {deals.length === 0
+              ? 'No deals yet. Add one to any stage, then drag cards between columns as they progress.'
+              : deals.length +
+                (deals.length === 1 ? ' deal on the board. ' : ' deals on the board. ') +
+                'Drag a card between columns to change its stage. Changes save automatically.'}
+          </p>
         </div>
         <button type="button" className="btn primary" onClick={() => openNew('Lead')}>
           Add deal
@@ -140,7 +146,7 @@ export default function Deals({ store }) {
             </header>
             <div className="column-body">
               {col.rows.length === 0 ? (
-                <p className="column-empty">Drop a deal here</p>
+                <p className="column-empty">No deals in this stage. Drop a card here or add one below.</p>
               ) : (
                 col.rows.map((d) => (
                   <article

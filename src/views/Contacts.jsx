@@ -122,7 +122,9 @@ export default function Contacts({ store }) {
         <div>
           <h1>Contacts</h1>
           <p className="muted">
-            {rows.length} of {contacts.length} shown
+            {contacts.length === 0
+              ? 'No contacts yet. Add your first one to start tracking conversations.'
+              : rows.length + ' of ' + contacts.length + ' shown'}
           </p>
         </div>
         <button type="button" className="btn primary" onClick={openNew}>
@@ -168,7 +170,17 @@ export default function Contacts({ store }) {
       </div>
 
       <div className="card table-card">
-        {rows.length === 0 ? (
+        {contacts.length === 0 ? (
+          <Empty
+            title="No contacts yet"
+            body="Add the people you are selling to. Each one gets a detail panel with their deals and an activity log."
+            action={
+              <button type="button" className="btn primary" onClick={openNew}>
+                Add contact
+              </button>
+            }
+          />
+        ) : rows.length === 0 ? (
           <Empty
             title="No contacts match these filters"
             body="Clear the search or pick a different company or tag."

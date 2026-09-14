@@ -31,7 +31,7 @@ export function fmtRelative(iso) {
 }
 
 export function initials(name) {
-  return name
+  return String(name || '')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)

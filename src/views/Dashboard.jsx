@@ -49,7 +49,13 @@ export default function Dashboard({ store, onNavigate }) {
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p className="muted">Where the pipeline stands today, across {contacts.length} contacts.</p>
+          <p className="muted">
+            {store.isEmpty
+              ? 'Nothing tracked yet. Add a company, a contact and a deal to fill this in.'
+              : 'Where the pipeline stands today, across ' +
+                contacts.length +
+                (contacts.length === 1 ? ' contact.' : ' contacts.')}
+          </p>
         </div>
         <button type="button" className="btn primary" onClick={() => onNavigate('deals')}>
           Open pipeline board

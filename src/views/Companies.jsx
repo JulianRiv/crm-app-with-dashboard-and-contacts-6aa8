@@ -90,7 +90,11 @@ export default function Companies({ store }) {
       <div className="page-head">
         <div>
           <h1>Companies</h1>
-          <p className="muted">{companies.length} accounts, ranked by open pipeline</p>
+          <p className="muted">
+            {companies.length === 0
+              ? 'No accounts yet. Add the first company you are working.'
+              : companies.length + (companies.length === 1 ? ' account' : ' accounts') + ', ranked by open pipeline'}
+          </p>
         </div>
         <button type="button" className="btn primary" onClick={openNew}>
           Add company
@@ -112,7 +116,19 @@ export default function Companies({ store }) {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {companies.length === 0 ? (
+        <div className="card">
+          <Empty
+            title="No companies yet"
+            body="Add an account to group its contacts and deals in one place."
+            action={
+              <button type="button" className="btn primary" onClick={openNew}>
+                Add company
+              </button>
+            }
+          />
+        </div>
+      ) : rows.length === 0 ? (
         <div className="card">
           <Empty
             title="No companies match"

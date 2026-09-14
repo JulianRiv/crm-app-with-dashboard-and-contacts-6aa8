@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildSeed } from './seed.js'
 
-const KEY = 'pipeline-crm.v1'
+const KEY = 'pipeline-crm.v2'
+
+const EMPTY = { companies: [], contacts: [], deals: [], activities: [] }
 
 function load() {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return buildSeed()
+    if (!raw) return { ...EMPTY }
     const parsed = JSON.parse(raw)
-    if (!parsed || !Array.isArray(parsed.contacts)) return buildSeed()
+    if (!parsed || typeof parsed !== 'object') return { ...EMPTY }
     return {
-      companies: parsed.companies || [],
-      contacts: parsed.contacts || [],
-      deals: parsed.deals || [],
-      activities: parsed.activities || []
+      companies: Array.isArray(parsed.companies) ? parsed.companies : [],
+      contacts: Array.isArray(parsed.contacts) ? parsed.contacts : [],
+      deals: Array.isArray(parsed.deals) ? parsed.deals : [],
+      activities: Array.isArray(parsed.activities) ? parsed.activities : []
     }
   } catch {
-    return buildSeed()
+    return { ...EMPTY }
   }
 }
 
@@ -81,8 +82,10 @@ export function useStore() {
     }
   }, [])
 
-  const reseed = useCallback(() => {
-    if (window.confirm('Replace all current data with the sample dataset?')) setData(buildSeed())
+  const clearAll = useCallback(() => {
+    if (window.confirm('Delete every contact, company, deal and note? This cannot be undone.')) {
+      setData({ ...EMPTY })
+    }
   }, [])
 
   const lookup = useMemo(() => {
@@ -91,5 +94,11 @@ export function useStore() {
     return { companyById, contactById }
   }, [data.companies, data.contacts])
 
-  return { data, ...api, reseed, ...lookup }
+  const isEmpty =
+    data.companies.length === 0 &&
+    data.contacts.length === 0 &&
+    data.deals.length === 0 &&
+    data.activities.length === 0
+
+  return { data, ...api, clearAll, isEmpty, ...lookup }
 }

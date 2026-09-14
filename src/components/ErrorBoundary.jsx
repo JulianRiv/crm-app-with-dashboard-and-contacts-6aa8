@@ -29,7 +29,7 @@ export default class ErrorBoundary extends Component {
             className="btn ghost"
             onClick={() => {
               try {
-                localStorage.removeItem('pipeline-crm.v1')
+                localStorage.removeItem('pipeline-crm.v2')
               } catch {
                 /* ignore */
               }

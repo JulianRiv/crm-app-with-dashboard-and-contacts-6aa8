@@ -110,8 +110,8 @@ export default function App() {
         <div className="sidebar-foot">
           <p className="side-label">Open pipeline</p>
           <p className="side-value">{fmtMoney(pipeline)}</p>
-          <button type="button" className="btn ghost sm" onClick={store.reseed}>
-            Reset sample data
+          <button type="button" className="btn ghost sm" onClick={store.clearAll} disabled={store.isEmpty}>
+            Clear all data
           </button>
         </div>
       </aside>
