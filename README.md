@@ -1,2 +1,21 @@
-# crm-app-with-dashboard-and-contacts-6aa8
-Created by Nubo
+# Pipeline CRM
+
+A single-page CRM for tracking contacts, companies and deals through a sales pipeline. All data lives in the browser under one localStorage key (`pipeline-crm.v1`) and is seeded with realistic sample data on first run.
+
+## Views
+
+- **Dashboard**: open pipeline value, open deal count, won this month, contact count, deal value by stage, closing soonest, recent activity.
+- **Contacts**: searchable and sortable table, filters by company and tag, detail drawer with deals and an activity timeline, add/edit modal with validation, delete with confirm.
+- **Companies**: account cards with contact count and open pipeline, detail drawer listing contacts and deals.
+- **Deals**: kanban board across Lead, Qualified, Proposal, Negotiation, Won and Lost with HTML5 drag-and-drop, per-column count and summed value, add/edit modal and a per-deal note log.
+
+## Scripts
+
+```
+npm install
+npm run dev     # local development
+npm run build   # production build
+npm start       # serve the build on $PORT (default 3000)
+```
+
+The deploy target is a Node app on port 3000, matching `nubo.toml`.

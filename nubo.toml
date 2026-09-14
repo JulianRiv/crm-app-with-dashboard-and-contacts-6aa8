@@ -1,0 +1,10 @@
+version = 1
+
+[project]
+name = "crm"
+
+[[frames]]
+name = "crm-app"
+stack = "node"
+port = 3000
+replicas = 1
