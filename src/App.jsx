@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store.js'
-import { SESSION_KEY, currentUser, logOut } from './auth.js'
+import { fetchSession, logOut } from './auth.js'
 import Auth from './views/Auth.jsx'
 import Settings from './views/Settings.jsx'
 import Dashboard from './views/Dashboard.jsx'
@@ -105,6 +105,41 @@ function UserMenu({ user, onSettings, onLogout }) {
   )
 }
 
+function BootScreen({ message }) {
+  return (
+    <div className="boot-page">
+      <div className="boot-card">
+        <span className="brand-mark lg" aria-hidden="true">
+          PC
+        </span>
+        <p className="boot-msg" role="status">
+          {message}
+        </p>
+        <span className="boot-bar" aria-hidden="true">
+          <span className="boot-bar-fill" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function BootError({ message, onRetry }) {
+  return (
+    <div className="boot-page">
+      <div className="boot-card">
+        <span className="brand-mark lg" aria-hidden="true">
+          PC
+        </span>
+        <h1 className="boot-title">Cannot reach the server</h1>
+        <p className="boot-msg">{message}</p>
+        <button type="button" className="btn primary" onClick={onRetry}>
+          Try again
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Workspace({ user, onUserChange, onSignOut }) {
   const store = useStore(user.id)
   const [view, setView] = useState(() => {
@@ -128,10 +163,17 @@ function Workspace({ user, onUserChange, onSignOut }) {
     return () => window.removeEventListener('hashchange', onPop)
   }, [])
 
+  // A 401 from any request means the cookie session ended (expired, or the
+  // account was deleted in another tab). Drop back to the login card instead
+  // of leaving a signed-in shell that cannot load or save anything.
+  useEffect(() => {
+    if (store.unauthorized) onSignOut({ serverCall: false })
+  }, [store.unauthorized, onSignOut])
+
   const pipeline = useMemo(() => {
     return store.data.deals
       .filter((d) => d.stage !== 'Won' && d.stage !== 'Lost')
-      .reduce((sum, d) => sum + d.value, 0)
+      .reduce((sum, d) => sum + (Number(d.value) || 0), 0)
   }, [store.data.deals])
 
   const results = useMemo(() => {
@@ -196,7 +238,7 @@ function Workspace({ user, onUserChange, onSignOut }) {
         </nav>
         <div className="sidebar-foot">
           <p className="side-label">Open pipeline</p>
-          <p className="side-value">{fmtMoney(pipeline)}</p>
+          <p className="side-value">{store.loading ? '—' : fmtMoney(pipeline)}</p>
           <UserMenu user={user} onSettings={() => setView('settings')} onLogout={onSignOut} />
         </div>
       </aside>
@@ -263,12 +305,29 @@ function Workspace({ user, onUserChange, onSignOut }) {
         </header>
 
         <main className="content" id="main">
-          {view === 'dashboard' && <Dashboard store={store} onNavigate={setView} />}
-          {view === 'contacts' && <Contacts store={store} />}
-          {view === 'companies' && <Companies store={store} />}
-          {view === 'deals' && <Deals store={store} />}
-          {view === 'settings' && (
-            <Settings user={user} store={store} onUserChange={onUserChange} onSignOut={onSignOut} />
+          {store.error && (
+            <div className="sync-banner" role="alert">
+              <span>{store.error}</span>
+              <button type="button" className="btn small" onClick={store.reload} disabled={store.saving}>
+                Retry
+              </button>
+            </div>
+          )}
+          {store.loading ? (
+            <div className="load-panel" role="status">
+              <span className="spinner" aria-hidden="true" />
+              Loading your records from the server…
+            </div>
+          ) : (
+            <>
+              {view === 'dashboard' && <Dashboard store={store} onNavigate={setView} />}
+              {view === 'contacts' && <Contacts store={store} />}
+              {view === 'companies' && <Companies store={store} />}
+              {view === 'deals' && <Deals store={store} />}
+              {view === 'settings' && (
+                <Settings user={user} store={store} onUserChange={onUserChange} onSignOut={onSignOut} />
+              )}
+            </>
           )}
         </main>
       </div>
@@ -278,35 +337,49 @@ function Workspace({ user, onUserChange, onSignOut }) {
 }
 
 export default function App() {
-  const [user, setUser] = useState(() => currentUser())
+  const [boot, setBoot] = useState({ status: 'loading', user: null, error: '' })
+
+  const loadSession = useCallback(async () => {
+    setBoot((b) => ({ ...b, status: 'loading', error: '' }))
+    const result = await fetchSession()
+    if (result.ok) {
+      setBoot({ status: 'ready', user: result.user, error: '' })
+      return
+    }
+    setBoot({ status: 'error', user: null, error: result.error })
+  }, [])
+
+  // The session lives in an HttpOnly cookie, so the only way to know who is
+  // signed in is to ask the server on boot.
+  useEffect(() => {
+    loadSession()
+  }, [loadSession])
 
   const handleAuthed = (nextUser) => {
     window.location.hash = 'dashboard'
-    setUser(nextUser)
+    setBoot({ status: 'ready', user: nextUser, error: '' })
   }
 
-  const handleSignOut = () => {
-    logOut()
+  // Logging out clears the server session and the cookie. Every record stays
+  // in Postgres under this user id and loads again on the next login.
+  const handleSignOut = useCallback(async (opts) => {
+    setBoot({ status: 'ready', user: null, error: '' })
     window.location.hash = ''
-    setUser(null)
-  }
-
-  // Another tab logging in or out on this browser should not leave a stale session here.
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === null || e.key === SESSION_KEY) setUser(currentUser())
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    if (!opts || opts.serverCall !== false) await logOut()
   }, [])
 
-  if (!user) return <Auth onAuthed={handleAuthed} />
+  if (boot.status === 'loading') return <BootScreen message="Checking your session…" />
+  if (boot.status === 'error') return <BootError message={boot.error} onRetry={loadSession} />
+  if (!boot.user) return <Auth onAuthed={handleAuthed} />
 
+  // Keying on the account id remounts the authenticated subtree when the
+  // session changes, so the store refetches for the new user instead of
+  // showing the previous account's rows.
   return (
     <Workspace
-      key={user.id}
-      user={user}
-      onUserChange={setUser}
+      key={boot.user.id}
+      user={boot.user}
+      onUserChange={(u) => setBoot({ status: 'ready', user: u, error: '' })}
       onSignOut={handleSignOut}
     />
   )

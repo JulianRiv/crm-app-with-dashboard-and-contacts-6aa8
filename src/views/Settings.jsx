@@ -1,8 +1,23 @@
-import { useState } from 'react'
-import { changePassword, deleteAccount, initialsFrom, isEmail, updateProfile } from '../auth.js'
+import { useRef, useState } from 'react'
+import {
+  changePassword,
+  deleteAccount,
+  exportAccountData,
+  initialsFrom,
+  isEmail,
+  updateProfile
+} from '../auth.js'
+import { COLLECTIONS } from '../store.js'
 import { fmtDate } from '../format.js'
 
+function countOf(payload) {
+  return COLLECTIONS.reduce((n, name) => n + (Array.isArray(payload[name]) ? payload[name].length : 0), 0)
+}
+
 export default function Settings({ user, store, onUserChange, onSignOut }) {
+  const fileRef = useRef(null)
+  const [transfer, setTransfer] = useState({ tone: '', message: '' })
+
   const [profile, setProfile] = useState({ name: user.name, email: user.email })
   const [profileErrors, setProfileErrors] = useState({})
   const [profileSaved, setProfileSaved] = useState(false)
@@ -14,12 +29,13 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
 
   const [confirmText, setConfirmText] = useState('')
   const [deleteError, setDeleteError] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const counts = store.data
   // Same rule the sidebar and topbar use, so the preview matches after saving.
   const initials = initialsFrom(profile.name, profile.email)
 
-  function saveProfile(e) {
+  async function saveProfile(e) {
     e.preventDefault()
     const errors = {}
     if (!profile.name.trim()) errors.name = 'Enter your name.'
@@ -29,7 +45,7 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
     setProfileSaved(false)
     if (Object.keys(errors).length > 0) return
 
-    const result = updateProfile(user.id, profile)
+    const result = await updateProfile(user.id, profile)
     if (!result.ok) {
       setProfileErrors({ [result.field || 'form']: result.error })
       return
@@ -68,18 +84,83 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
     }
   }
 
-  function removeAccount(e) {
+  async function exportData() {
+    setTransfer({ tone: '', message: 'Preparing your export…' })
+    // The file is built from what the database holds right now, not from the
+    // copy in this tab, so an export is always complete.
+    const result = await exportAccountData()
+    if (!result.ok) {
+      setTransfer({ tone: 'error', message: result.error })
+      return
+    }
+    try {
+      const payload = result.payload
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const stamp = new Date().toISOString().slice(0, 10)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `pipeline-crm-${stamp}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setTransfer({ tone: 'ok', message: `Exported ${countOf(store.data)} records.` })
+    } catch {
+      setTransfer({ tone: 'error', message: 'The browser blocked the download. Try again.' })
+    }
+  }
+
+  async function importData(e) {
+    const file = e.target.files && e.target.files[0]
+    if (fileRef.current) fileRef.current.value = ''
+    if (!file) return
+    setTransfer({ tone: '', message: '' })
+    let records = null
+    try {
+      const parsed = JSON.parse(await file.text())
+      records = parsed && parsed.records && typeof parsed.records === 'object' ? parsed.records : parsed
+      if (!records || typeof records !== 'object' || !COLLECTIONS.some((name) => Array.isArray(records[name]))) {
+        setTransfer({ tone: 'error', message: 'That file is not a Pipeline CRM export. Nothing was changed.' })
+        return
+      }
+    } catch {
+      setTransfer({ tone: 'error', message: 'That file could not be read as JSON. Nothing was changed.' })
+      return
+    }
+    const incoming = countOf(records)
+    const proceed = window.confirm(
+      `Replace this account's ${countOf(store.data)} records with ${incoming} from the file? This overwrites what is stored now.`
+    )
+    if (!proceed) {
+      setTransfer({ tone: '', message: 'Import cancelled. Nothing was changed.' })
+      return
+    }
+    store.replaceAll(records)
+    setTransfer({ tone: 'ok', message: `Imported ${incoming} records into this account.` })
+  }
+
+  async function removeAccount(e) {
     e.preventDefault()
+    if (deleteBusy) return
     if (confirmText.trim().toLowerCase() !== 'delete') {
       setDeleteError('Type delete to confirm.')
       return
     }
-    const result = deleteAccount(user.id)
-    if (!result.ok) {
-      setDeleteError(result.error)
-      return
+    setDeleteBusy(true)
+    try {
+      // The server cascades every company, contact, deal and note from the
+      // user row and clears the session cookie, so there is nothing left to
+      // sign out of: skip the logout call and drop straight to the login card.
+      const result = await deleteAccount()
+      if (!result.ok) {
+        setDeleteError(result.error)
+        return
+      }
+      onSignOut({ serverCall: false })
+    } finally {
+      setDeleteBusy(false)
     }
-    onSignOut()
   }
 
   return (
@@ -87,7 +168,7 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
       <div className="page-head">
         <div>
           <h1>Settings</h1>
-          <p className="muted">Your account details and the data stored for it in this browser.</p>
+          <p className="muted">Your account details and the records stored for it on the server.</p>
         </div>
       </div>
 
@@ -244,18 +325,47 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
           </li>
         </ul>
         <p className="muted small">
-          These records belong to this account only. Other accounts on this browser cannot see them.
+          These records live in Postgres under your account id. They stay there when you log out and load
+          again from any browser you log in from. No other account can read them.
         </p>
-        {store.isEmpty && (
+        {store.error && (
+          <p className="form-alert" role="alert">
+            {store.error}
+          </p>
+        )}
+        {store.isEmpty && !store.error && (
           <p className="muted small">
             Nothing stored yet. Add a contact, company or deal and it will show up here.
           </p>
         )}
         <div className="form-actions">
+          <button type="button" className="btn primary" onClick={exportData} disabled={store.isEmpty}>
+            Export data
+          </button>
+          <button type="button" className="btn" onClick={() => fileRef.current && fileRef.current.click()}>
+            Import data
+          </button>
           <button type="button" className="btn" onClick={store.clearAll} disabled={store.isEmpty}>
             Clear all records
           </button>
+          <input
+            ref={fileRef}
+            className="sr-only"
+            type="file"
+            accept="application/json,.json"
+            onChange={importData}
+            aria-label="Choose a Pipeline CRM export file to import"
+          />
         </div>
+        {transfer.message && (
+          <p className={transfer.tone === 'error' ? 'error' : 'ok-msg'} role="status">
+            {transfer.message}
+          </p>
+        )}
+        <p className="hint">
+          Export writes a JSON file of every contact, company, deal and note in this account. Import asks
+          you to confirm before it replaces what is stored now.
+        </p>
       </section>
 
       <section className="card settings-card danger-zone" aria-labelledby="sec-danger">
@@ -263,8 +373,8 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
           <h2 id="sec-danger">Delete account</h2>
         </div>
         <p className="muted">
-          Deleting removes your login and every contact, company, deal and note stored under it in this
-          browser. There is no undo and no backup.
+          Deleting removes your login and every contact, company, deal and note stored under it in the
+          database. There is no undo and no backup. Export your data first if you want a copy.
         </p>
         <form className="form" onSubmit={removeAccount} noValidate>
           <div className="field">
@@ -287,9 +397,9 @@ export default function Settings({ user, store, onUserChange, onSignOut }) {
             <button
               type="submit"
               className="btn danger-solid"
-              disabled={confirmText.trim().toLowerCase() !== 'delete'}
+              disabled={deleteBusy || confirmText.trim().toLowerCase() !== 'delete'}
             >
-              Delete this account
+              {deleteBusy ? 'Deleting…' : 'Delete this account'}
             </button>
           </div>
         </form>

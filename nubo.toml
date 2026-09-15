@@ -4,7 +4,16 @@ version = 1
 name = "crm"
 
 [[frames]]
-name = "crm-app"
+name = "default"
 stack = "node"
 port = 3000
 replicas = 1
+
+[[frames]]
+name = "crm-pipeline-db"
+kind = "database"
+engine = "postgres"
+version = "16"
+storage_gb = 10
+inject_into = "default"
+inject_as = "DATABASE_URL"

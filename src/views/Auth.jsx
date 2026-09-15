@@ -80,8 +80,8 @@ export default function Auth({ onAuthed }) {
         <h1 className="auth-title">{isSignUp ? 'Create your account' : 'Log in to your pipeline'}</h1>
         <p className="auth-sub">
           {isSignUp
-            ? 'Your contacts, companies and deals stay in this browser, under your account only.'
-            : 'Contacts, companies, deals and notes are kept per account on this device.'}
+            ? 'Your contacts, companies and deals are stored on the server under your account only.'
+            : 'Pick up your pipeline where you left it, from any browser you log in from.'}
         </p>
 
         <div className="auth-tabs" role="tablist" aria-label="Account access">
@@ -213,15 +213,15 @@ export default function Auth({ onAuthed }) {
         </form>
 
         <p className="auth-switch">
-          {isSignUp ? 'Already have an account on this browser?' : 'No account on this browser yet?'}{' '}
+          {isSignUp ? 'Already have an account?' : 'No account yet?'}{' '}
           <button type="button" className="link-btn" onClick={() => switchTo(isSignUp ? 'login' : 'signup')}>
             {isSignUp ? 'Log in' : 'Sign up'}
           </button>
         </p>
 
         <p className="auth-note">
-          Accounts and data are stored in this browser only. Clearing site data removes them, and this is
-          not a substitute for real server-side security.
+          Passwords are hashed with scrypt and a per-account salt. Your session is an HttpOnly cookie, so
+          no script in the page can read it.
         </p>
       </main>
     </div>
