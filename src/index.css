@@ -1,7 +1,10 @@
 :root {
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
-  --accent-soft: #eff6ff;
+  --accent: #7c3aed;
+  --accent-strong: #6d28d9;
+  --accent-light: #a78bfa;
+  --accent-soft: #f5f3ff;
+  --accent-border: #ddd6fe;
+  --accent-ring: rgba(124, 58, 237, 0.28);
   --accent-fg: #ffffff;
 
   --bg: #f6f7f9;
@@ -223,6 +226,13 @@ textarea:focus-visible,
 .column-add:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .sidebar-foot {
@@ -569,16 +579,16 @@ select[aria-invalid='true'] {
   transition: width 220ms ease;
 }
 .bar-fill.stage-lead {
-  background: #93c5fd;
+  background: #ddd6fe;
 }
 .bar-fill.stage-qualified {
-  background: #60a5fa;
+  background: #c4b5fd;
 }
 .bar-fill.stage-proposal {
-  background: #3b82f6;
+  background: var(--accent-light);
 }
 .bar-fill.stage-negotiation {
-  background: #1d4ed8;
+  background: var(--accent-strong);
 }
 .bar-fill.stage-won {
   background: #059669;
@@ -666,12 +676,12 @@ select[aria-invalid='true'] {
 .chip.type-call {
   background: var(--accent-soft);
   color: var(--accent-strong);
-  border-color: #bfdbfe;
+  border-color: var(--accent-border);
 }
 .chip.type-email {
-  background: #f5f3ff;
-  color: #5b21b6;
-  border-color: #ddd6fe;
+  background: #fdf2f8;
+  color: #9d174d;
+  border-color: #fbcfe8;
 }
 .chip.type-meeting {
   background: #ecfeff;
@@ -684,8 +694,8 @@ select[aria-invalid='true'] {
   border-color: #a7f3d0;
 }
 .chip.stage-chip-lost {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--surface-2);
+  color: var(--text-2);
 }
 .chip.stage-chip-negotiation,
 .chip.stage-chip-proposal,
@@ -693,7 +703,7 @@ select[aria-invalid='true'] {
 .chip.stage-chip-lead {
   background: var(--accent-soft);
   color: var(--accent-strong);
-  border-color: #bfdbfe;
+  border-color: var(--accent-border);
 }
 
 /* Table */
@@ -848,16 +858,16 @@ select[aria-invalid='true'] {
   background: var(--accent);
 }
 .stage-dot.stage-lead {
-  background: #93c5fd;
+  background: #ddd6fe;
 }
 .stage-dot.stage-qualified {
-  background: #60a5fa;
+  background: #c4b5fd;
 }
 .stage-dot.stage-proposal {
-  background: #3b82f6;
+  background: var(--accent-light);
 }
 .stage-dot.stage-negotiation {
-  background: #1d4ed8;
+  background: var(--accent-strong);
 }
 .stage-dot.stage-won {
   background: #059669;
